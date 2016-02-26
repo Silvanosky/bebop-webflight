@@ -99,8 +99,8 @@ it is faily straightforward.
 
 ## Thanks
 
-Thanks to [ardrone-webflight](https://github.com/eschnou/ardrone-webflight) for there work and [node-bebop](https://github.com/hybridgroup/node-bebop.git)
-for there library.
+Thanks to [ardrone-webflight](https://github.com/eschnou/ardrone-webflight) for their work and [node-bebop](https://github.com/hybridgroup/node-bebop.git)
+for their library.
 
 ## License
 
