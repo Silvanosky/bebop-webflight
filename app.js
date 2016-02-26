@@ -4,9 +4,17 @@ var express = require('express')
   , path = require('path')
   , server = require("http").createServer(app)
   , io = require('socket.io').listen(server)
-  , arDrone = require('ar-drone')
-  , arDroneConstants = require('ar-drone/lib/constants')
+  , arDrone = require('node-bebop')
   ;
+var gamepad = require("gamepad");
+
+// Initialize the library
+gamepad.init();
+
+// List the state of all currently attached devices
+for (var i = 0, l = gamepad.numDevices(); i < l; i++) {
+    console.log(i, gamepad.deviceAtIndex());
+}
 
 // Fetch configuration
 try {
@@ -57,23 +65,29 @@ function navdata_option_mask(c) {
   return 1 << c;
 }
 
-// From the SDK.
-var navdata_options = (
-    navdata_option_mask(arDroneConstants.options.DEMO) 
-  | navdata_option_mask(arDroneConstants.options.VISION_DETECT)
-  | navdata_option_mask(arDroneConstants.options.MAGNETO)
-  | navdata_option_mask(arDroneConstants.options.WIFI)
-);
-
 // Connect and configure the drone
-var client = new arDrone.createClient({timeout:4000});
-client.config('general:navdata_demo', 'TRUE');
-client.config('video:video_channel', '0');
-client.config('general:navdata_options', navdata_options);
+var client = new arDrone.createClient();
+
+client.connect(function (){
+
+    
+    //client.PictureSettings.autoWhiteBalanceSelection(0);
+    //client.PictureSettings.expositionSelection(0);
+    //client.PictureSettings.saturationSelection(0);
+        client.videoEnable();
+});
 
 // Add a handler on navdata updates
-var latestNavData;
-client.on('navdata', function (d) {
+var movement = {
+            roll : 0,
+            pitch : 0,
+            yaw: 0,
+            altitude : 0,
+            speed : 0
+            // no idea...
+        };
+
+client.on("navdata", function (d) {
     latestNavData = d;
 });
 
@@ -99,15 +113,37 @@ client.on('flying', function() {
   io.sockets.emit('flying');
 });
 
+client.on('battery', function(data) {
+  console.log('Batterie: '+data);
+  io.sockets.emit('battery', data);
+});
+
 // Process new websocket connection
 io.set('log level', 1);
 io.sockets.on('connection', function (socket) {
   socket.emit('event', { message: 'Welcome to cockpit :-)' });
 });
 
+client.on('AltitudeChanged', function(data) {
+  //console.log('Altitude: '+data);
+  movement.altitude = data;
+});
+client.on('SpeedChanged', function(data) {
+  //console.log('Speed: '+data);
+  movement.speed = data;
+});
+client.on('AttitudeChanged', function(data) {
+  
+  movement.roll = data.roll;
+  movement.pitch = data.pitch;
+  movement.yaw  = data.yaw * 180 / Math.PI;
+  //console.log('Attitude: '+movement.roll);
+});
+        
+
 // Schedule a time to push navdata updates
 var pushNavData = function() {
-    io.sockets.emit('navdata', latestNavData);
+    io.sockets.emit('movement', movement);
 };
 var navTimer = setInterval(pushNavData, 100);
 
@@ -159,4 +195,174 @@ config.plugins.forEach(function (plugin) {
 server.listen(app.get('port'), function() {
   console.log('AR. Drone WebFlight is listening on port ' + app.get('port'));
 });
+
+var drone = client;
+
+// Create a game loop and poll for events
+setInterval(gamepad.processEvents, 16);
+// Scan for new gamepads as a slower rate
+setInterval(gamepad.detectDevices, 500);
+
+setInterval(move, 24);
+
+var posMov = {
+    x: 0,
+    y: 0
+};
+
+var posRel = {
+    up: 0,
+    side: 0
+};
+
+function move()
+{
+    var activate = 1;
+    if(nearZero(posMov.x) && nearZero(posMov.y))
+    {
+        activate = 0;
+        posMov.x = 0;
+        posMov.y = 0;
+    }
+    drone._pcmd = {
+        flag: activate,
+        roll: posMov.x,
+        pitch: posMov.y,
+        yaw: posRel.side,
+        gaz: posRel.up,
+    };
+
+
+}
+
+function nearZero(value)
+{
+    return (value > -20 && value < 20);
+}
+
+// Listen for move events on all gamepads
+gamepad.on("move", function (id, axis, value) {
+    /*console.log("move", {
+        id: id,
+        axis: axis,
+        value: value,
+    });*/
+
+    value = Math.trunc(value * 100);
+    if(nearZero(value))
+    {
+        value = 0;
+    }
+    if(axis == 1)
+    {
+        posRel.up = value;
+    }else if(axis == 0)
+    {
+        posRel.side = value;
+    }else if(axis == 3)
+    {
+        posMov.y = value;
+    }else if(axis == 2)
+    {
+        posMov.x = value;
+    }
+});
+
+// Listen for button up events on all gamepads
+gamepad.on("up", function (id, num) {
+    console.log("up", {
+        id: id,
+        num: num,
+    });
+});
+
+// Listen for button down events on all gamepads
+gamepad.on("down", function (id, num) {
+    console.log("down", {
+        id: id,
+        num: num,
+    });
+    var perDegree = 3;
+    if(num == 0)
+    {
+        camMov.tilt += perDegree;
+        moveCam();
+    }else if(num == 1)
+    {
+        camMov.tilt += -perDegree;
+        moveCam();
+    }else if(num == 2)
+    {
+        camMov.pan += -perDegree;
+        moveCam();
+    }else if(num == 3)
+    {
+        camMov.pan += perDegree;
+        moveCam();
+    }else if( num == 4)
+    {
+        toggleFly();
+    }else if(num == 5)
+    {
+        drone.emergency();
+        isFlying = false;
+    }else if(num == 8)
+    {
+        camMov = {
+            tilt: 0,
+            pan: 0
+        };
+        moveCam();
+    }else if(num == 11)
+    {
+        toggleRecord();
+    }
+});
+
+var camMov = {
+    tilt: 0,
+    pan: 0
+};
+
+function moveCam()
+{
+    drone.Camera.orientation(camMov);
+    if(camMov.tilt > 180)
+        camMov.tilt = 180;
+    if(camMov.tilt < -180)
+        camMov.tilt = -180;
+    
+    if(camMov.pan > 180)
+        camMov.pan = 180;
+    if(camMov.pan < -180)
+        camMov.pan = -180;
+}
+
+var isRecording = false;
+function toggleRecord()
+{
+    if(isRecording)
+    {
+        console.log("Stop recording.");
+        drone.stopRecording();
+        isRecording = false;
+    }else {
+        console.log("Start recording.");
+        drone.startRecording();
+        isRecording = true;
+    }
+}
+
+var isFlying = false;
+function toggleFly()
+{
+    if(isFlying)
+    {
+        drone.land();
+        isFlying = false;
+    }else {
+        drone.takeoff();
+        isFlying = true;
+    }
+}
 

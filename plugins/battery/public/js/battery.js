@@ -11,17 +11,17 @@
         this.level = 100;
 
         // Add required UI elements
-        $(".header-container .wrapper").prepend('<div id="battery"><canvas class="gauge" width="50px;" height="25px;" /><span class="level">100%</span></div>');
+        $(".header-container .wrapper").prepend('<div id="battery"><canvas class="gauge" width="50px;" height="25px;" /></div>');//<span class="level">100%</span>
         this.ctx = $('#battery .gauge').get(0).getContext('2d');
         
         // Bind to navdata events on websockets
         var self = this;
-        this.cockpit.socket.on('navdata', function(data) {
-            if (!jQuery.isEmptyObject(data)) {
+        this.cockpit.socket.on('battery', function(data) {
+           // if (!jQuery.isEmptyObject(data)) {
                 requestAnimationFrame(function() {
                     self.render(data);
                 });
-            }
+            //}
         });
 
         // Initial draw
@@ -29,8 +29,8 @@
     };
 
     Battery.prototype.render = function(data) {
-        this.level = data.demo.batteryPercentage;
-        $("#battery .level").text(this.level + '%');
+        this.level = data;
+        //$("#battery .level").text(this.level + '%');
         this.draw();
     }
 
@@ -49,7 +49,10 @@
         var width = Math.floor(this.level / 100 * 35);
         this.ctx.fillStyle = this.getColor();
         roundRect(this.ctx, 8, 3, width, 15, 3, true, false);
-          
+        
+        this.ctx.fillStyle = this.getTextColor();
+        this.ctx.textAlign = "center";
+        this.ctx.fillText(this.level + "%", cw/2, ch/2); 
         this.ctx.restore();
     }
 
@@ -72,6 +75,28 @@
             return 'red';
         } else {
             return 'darkred';
+        }
+    }
+    
+    Battery.prototype.getTextColor = function() {
+        if (this.level > 90) {
+            return 'black';
+        } else if (this.level > 80) {
+            return 'black';
+        } else if (this.level > 70) {
+            return 'white';
+        } else if (this.level > 60) {
+            return 'white';
+        } else if (this.level > 50) {
+            return 'black';
+        } else if (this.level > 40) {
+            return 'white';
+        } else if (this.level > 30) {
+            return 'white';
+        } else if (this.level > 20) {
+            return 'white';
+        } else {
+            return 'white';
         }
     }
 

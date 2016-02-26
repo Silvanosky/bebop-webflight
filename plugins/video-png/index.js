@@ -15,9 +15,8 @@ function video(name, deps) {
     });
 
     // Add a handler on images update
-    deps.client.getPngStream()
-      .on('error', console.log)
-      .on('data', function(frame) { 
+    deps.client.getMjpegStream()
+      .on("data", function(frame) { 
         latestImage = frame; 
     }); 
 };

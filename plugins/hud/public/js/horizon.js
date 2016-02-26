@@ -64,6 +64,7 @@
         this.cockpit = cockpit;
         this.roll = 0;
         this.pitch = 0;
+        this.yaw = 0;
         this.altitude = 0;
         this.speed = 0;
 
@@ -73,7 +74,7 @@
 
         // Bind to navdata events on websockets
         var ah = this;
-        this.cockpit.socket.on('navdata', function(data) {
+        this.cockpit.socket.on('movement', function(data) {
             if (!jQuery.isEmptyObject(data)) {
                 requestAnimationFrame(function() {
                     ah.render(data);
@@ -90,22 +91,17 @@
     };
 
     AH.prototype.render = function(data) {
-        this.setValues({
-            roll : data.demo.rotation.roll * Math.PI / 180,
-            pitch : data.demo.rotation.pitch * Math.PI / 180,
-            altitude : data.demo.altitudeMeters,
-            speed : data.demo.velocity.z
-            // no idea...
-        });
+        this.setValues(data);
 
         this.draw();
     }
         
     AH.prototype.setValues = function setValues(values) {
-        this.roll = values.roll;
-        this.pitch = values.pitch;
-        this.altitude = values.altitude;
-        this.speed = values.speed;
+        this.roll = -values.roll;
+        this.pitch = -values.pitch;
+        this.yaw = values.yaw;
+        this.altitude = values.altitude.altitude;
+        this.speed = values.speed.speedY;
     };
 
     AH.prototype.drawHorizon = function drawHorizon() {
@@ -320,8 +316,8 @@
         );
         this.ctx.clip();
 
-        yellowBoundaryY = -(-this.speed + yellowBoundarySpeed) / 10 * pixelsPer10Kmph;
-        redBoundaryY = -(-this.speed + redBoundarySpeed) / 10 * pixelsPer10Kmph;
+        yellowBoundaryY = -(-this.speed + yellowBoundarySpeed) * pixelsPer10Kmph;
+        redBoundaryY = -(-this.speed + redBoundarySpeed) * pixelsPer10Kmph;
 
         this.ctx.fillStyle = 'yellow';
         this.ctx.fillRect(
@@ -341,7 +337,7 @@
             speedWarningWidth, +speedIndicatorHeight / 2 - yellowBoundaryY
         );
 
-        yOffset = this.speed / 10 * pixelsPer10Kmph;
+        yOffset = this.speed * pixelsPer10Kmph;
 
         // The unclipped ticks to be rendered.
         // We render 100kmph either side of the center to be safe
