@@ -74,7 +74,7 @@ client.connect(function (){
     //client.PictureSettings.autoWhiteBalanceSelection(0);
     //client.PictureSettings.expositionSelection(0);
     //client.PictureSettings.saturationSelection(0);
-        client.videoEnable();
+        client.videoEnable(1);
 });
 
 // Add a handler on navdata updates
